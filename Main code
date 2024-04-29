@@ -1,0 +1,626 @@
+import pyomo.environ as pe
+import pandas as pd
+import numpy as np
+import random as rand
+import matplotlib.pyplot as pt
+
+sc_initial = 
+sc_numb = 
+
+period = 
+CO2_scale = 
+CO2_tax = [100, 150, 200][period] * CO2_scale
+
+H_scale = 
+Fuel_scale = 
+Bey = True
+
+min_ATR = 
+ATR_ramp_rate = 
+min_SMR = 
+SMR_ramp_rate = 
+SMRCC_ramp_rate = 
+#NGCC ramp rate
+ramp_rate = 
+
+A_scale = 
+min_A = 
+elec_cost =
+# buying price so should it be lowered?
+# dollar per MWh
+By = 
+#Blue yes?
+Ey = 
+Hy = 
+#demand yes?
+Ay = 
+Py = 
+#elecgtrolyzer yes?
+Buy_y = 
+
+
+Hd_const = 
+
+if Hy == True:
+    Year_Demand = 2 * 1e4  * H_scale
+else:
+    Year_Demand = 0
+    print('no hydrogen')
+if Ey == True:
+    e_factor = [][period]
+else:
+    e_factor = 0
+    print('no electricity')
+
+fuel_cost =  * Fuel_scale
+# dollar per MMBTu
+IC_P = [][period]
+IC_B = [][period]
+IC_W = [][period]
+IC_Ht = [][period]
+IC_A = [][period] * A_scale
+
+min_W = 
+A_eff = 
+min_NGCC = 
+
+
+# Renewable data 
+Renewable_Source = pd.read_excel(r"path\CA_candidate.xlsx", engine='openpyxl')
+e_Demand_Source = pd.read_excel(r"path\CA_electricity_ratio.xlsx", engine='openpyxl')
+Demand_Source = pd.read_csv(r"path\USA_demand_G.csv")
+
+RS = pd.DataFrame(Renewable_Source)
+Solar_CF = RS['solar_CF']
+SF = np.zeros((8760, sc_numb))
+
+for i in range(sc_numb):
+    for j in range(8760):
+        SF[j][i] = Solar_CF[(sc_initial + i) * 8760 + j]
+        #SF[j][i] = Solar_CF.mean()
+
+
+# e_demand
+e_demand = np.zeros((8760, sc_numb))
+H_demand = np.zeros((8760, sc_numb))
+
+ED = pd.DataFrame(e_Demand_Source)
+ED = ED['Ratio']
+#for i in range(sc_numb):
+#    for j in range(8760):
+#        e_demand[j, i] = e_factor * ED[j + i * 8760]
+
+
+if Hd_const == True:
+    # H constant
+    for i in range(sc_numb):
+        for j in range(8760):
+            H_demand[j, i] = Year_Demand / 8760
+else:
+    # H_demand seasonality
+    print('seasonal H demand')
+    for i in range(sc_numb):
+        for j in range(8760):
+            H_demand[j, i] = Year_Demand / 8760 * ED[j + i * 8760]
+
+
+Ti = np.arange(8760)
+Sc = np.arange(sc_numb)
+model = pe.ConcreteModel()
+# model.XB = pe.Var(within=pe.NonNegativeIntegers, bounds=(1, 200))
+model.XB = pe.Var(bounds=(0, None))
+# model.XP = pe.Var(within=pe.NonNegativeIntegers, bounds=(1, 100))
+model.XP = pe.Var(bounds=(0, None))
+# model.XW = pe.Var(within=pe.NonNegativeIntegers, bounds=(1, 100))
+model.XW = pe.Var(bounds=(0, None))
+model.XHt = pe.Var(bounds=(0, None))
+model.XNGCC = pe.Var(bounds=(0, None))
+model.XATR = pe.Var(bounds=(0, None))
+model.XA = pe.Var(bounds=(0, None))
+model.XSMR = pe.Var(bounds=(0, None))
+model.XSMRCC = pe.Var(bounds=(0, None))
+
+model.a1 = pe.Var(bounds=(0, 1))
+model.a2 = pe.Var(bounds=(0, 1))
+model.a3 = pe.Var(bounds=(0, 1))
+model.a4 = pe.Var(bounds=(0, 1))
+model.a5 = pe.Var(bounds=(0, 1))
+model.b1 = pe.Var(within=pe.Binary)
+model.b2 = pe.Var(within=pe.Binary)
+model.b3 = pe.Var(within=pe.Binary)
+model.b4 = pe.Var(within=pe.Binary)
+model.b5 = pe.Var(within=pe.Binary)
+
+model.a11 = pe.Var(bounds=(0, 1))
+model.a21 = pe.Var(bounds=(0, 1))
+model.a31 = pe.Var(bounds=(0, 1))
+model.a41 = pe.Var(bounds=(0, 1))
+model.b11 = pe.Var(within=pe.Binary)
+model.b21 = pe.Var(within=pe.Binary)
+model.b31 = pe.Var(within=pe.Binary)
+model.b41 = pe.Var(within=pe.Binary)
+
+model.a12 = pe.Var(bounds=(0, 1))
+model.a22 = pe.Var(bounds=(0, 1))
+model.a32 = pe.Var(bounds=(0, 1))
+model.a42 = pe.Var(bounds=(0, 1))
+model.b12 = pe.Var(within=pe.Binary)
+model.b22 = pe.Var(within=pe.Binary)
+model.b32 = pe.Var(within=pe.Binary)
+model.b42 = pe.Var(within=pe.Binary)
+
+module_size = 
+W_size = 
+
+B_eff =
+P_eff =
+W_eff = 
+ATR_eff = 
+SMR_eff = 
+SMRCC_eff = 
+IC_NGCC = 
+
+model.ESS = pe.Var(Ti, Sc, bounds=(0, None))
+model.ch = pe.Var(Ti, Sc, bounds=(0, None))
+model.dch = pe.Var(Ti, Sc, bounds=(0, None))
+model.YHt = pe.Var(Ti, Sc, bounds=(0, None))
+model.D2A = pe.Var(Ti, Sc, bounds=(0, None))
+model.A2D = pe.Var(Ti, Sc, bounds=(0, None))
+model.SMR = pe.Var(Ti, Sc, bounds=(0, None))
+if Bey == True:
+    model.NGCC = pe.Var(Ti, Sc, bounds=(0, None))
+else:
+    model.NGCC = pe.Var(Ti, Sc, bounds=(0, 0))
+
+if By==True:
+    #model.NGCC = pe.Var(Ti, Sc, bounds=(0, None))
+    model.ATR = pe.Var(Ti, Sc, bounds=(0, None))
+    model.SMRCC = pe.Var(Ti, Sc, bounds=(0, None))
+else:
+    #model.NGCC = pe.Var(Ti, Sc, bounds=(0, 0))
+    model.ATR = pe.Var(Ti, Sc, bounds=(0, 0))
+    model.SMRCC = pe.Var(Ti, Sc, bounds=(0, 0))
+    print('no Blue')
+if Buy_y == True:
+    model.buy = pe.Var(Ti, Sc, bounds=(0, None))
+    #model.buy2 = pe.Var(bounds=(0, None))
+else:
+    model.buy = pe.Var(Ti, Sc, bounds=(0, 0))
+    #model.buy2 = pe.Var(bounds=(0, 0))
+# model.buy2 = pe.Var(Ti, Sc, bounds=(0, None))
+model.out = pe.Var(Ti, Sc, bounds=(0, None))
+if Py == True:
+    model.p2x = pe.Var(Ti, Sc, bounds=(0, None))
+else:
+    model.p2x = pe.Var(Ti, Sc, bounds=(0, 0))
+    print('no pem')
+if Ay == True:
+    model.p2a = pe.Var(Ti, Sc, bounds=(0, None))
+else:
+    model.p2a = pe.Var(Ti, Sc, bounds=(0, 0))
+    print('no alkaline')
+
+# def obj_rule(model):
+#    return sum(model.out[i]+1000*(model.sup[i]-model.dem[i]) for i in model.t)
+model.obj = pe.Objective(expr=(
+        (0.025 + 0.14238) * model.XB * IC_B +
+        (0.02 + 0.14238) * IC_W * model.XW +
+        (0.02 + 0.14238) * IC_A * model.XA +
+        (0.02 + 0.07723) * model.XP * IC_P +
+        (0.01 + 0.08581) * model.XHt * IC_Ht +
+        (0.03 + 0.08581) * model.XNGCC * IC_NGCC +
+        (0.04 + 0.08581) * (model.a1 * 0 + model.a2 *  + model.a3 *  + model.a4 *  + model.a5 * ) +
+        (0.04 + 0.08581) * (model.a11 * 0 + model.a21 *  + model.a31 *  + model.a41 *  ) +
+        (0.04 + 0.08581) * (model.a12 * 0 + model.a22 *  + model.a32 *  + model.a42 *  ) +
+        sum(model.buy[t, sc] * (elec_cost + 0. * CO2_tax) + model.NGCC[t, sc] * (
+                    7. * fuel_cost + 5.6 + 0. * CO2_tax)
+            + model.ATR[t, sc] * ( * fuel_cost + 0. * CO2_tax)
+        + model.SMRCC[t, sc] * ( * fuel_cost + 1. * CO2_tax)
+        + model.SMR[t, sc] * ( * fuel_cost + 9. * CO2_tax)
+            for t in Ti for sc in Sc) / sc_numb / 1e6)  , sense=pe.minimize)
+
+
+def con0a_rule(model):
+    return model.XATR == (0 * model.a1 +  * model.a2 +  * model.a3 +  * model.a4 + 1000 * model.a5) / 24
+model.con0a = pe.Constraint(rule=con0a_rule)
+
+def con0a_rule11(model):
+    return model.XSMRCC == (0 * model.a11 +  * model.a21 +  * model.a31 +  * model.a41) / 24
+model.con0a11 = pe.Constraint(rule=con0a_rule11)
+
+def con0a_rule12(model):
+    return model.XSMR == (0 * model.a12 +  * model.a22 +  * model.a32 +  * model.a42) / 24
+model.con0a12 = pe.Constraint(rule=con0a_rule12)
+
+def con0a1_rule(model):
+    return model.a1 + model.a2 + model.a3 + model.a4 + model.a5 == 1
+model.con0a1 = pe.Constraint(rule=con0a1_rule)
+
+def con0a1_rule11(model):
+    return model.a11 + model.a21 + model.a31 + model.a41  == 1
+model.con0a111 = pe.Constraint(rule=con0a1_rule11)
+
+def con0a1_rule12(model):
+    return model.a12 + model.a22 + model.a32 + model.a42  == 1
+model.con0a112 = pe.Constraint(rule=con0a1_rule12)
+
+
+def conb_rule1(model):
+    return model.b1 + model.b3 <= 1
+model.conb1 = pe.Constraint(rule=conb_rule1)
+def conb_rule2(model):
+    return model.b1 + model.b4 <= 1
+model.conb2 = pe.Constraint(rule=conb_rule2)
+def conb_rule3(model):
+    return model.b1 + model.b5 <= 1
+model.conb3 = pe.Constraint(rule=conb_rule3)
+def conb_rule4(model):
+    return model.b2 + model.b4 <= 1
+model.conb4 = pe.Constraint(rule=conb_rule4)
+def conb_rule5(model):
+    return model.b2 + model.b5 <= 1
+model.conb5 = pe.Constraint(rule=conb_rule5)
+def conb_rule6(model):
+    return model.b3 + model.b5 <= 1
+model.conb6 = pe.Constraint(rule=conb_rule6)
+def conb_rule11(model):
+    return model.b11 + model.b31 <= 1
+model.conb11 = pe.Constraint(rule=conb_rule11)
+def conb_rule21(model):
+    return model.b11 + model.b41 <= 1
+model.conb21 = pe.Constraint(rule=conb_rule21)
+def conb_rule31(model):
+    return model.b21 + model.b41 <= 1
+model.conb31 = pe.Constraint(rule=conb_rule31)
+def conb_rule12(model):
+    return model.b12 + model.b32 <= 1
+model.conb12 = pe.Constraint(rule=conb_rule12)
+def conb_rule22(model):
+    return model.b12 + model.b42 <= 1
+model.conb22 = pe.Constraint(rule=conb_rule22)
+def conb_rule32(model):
+    return model.b22 + model.b42 <= 1
+model.conb32 = pe.Constraint(rule=conb_rule32)
+
+
+
+def conc1_rule(model):
+    return model.a1 <= model.b1
+model.conc1 = pe.Constraint(rule=conc1_rule)
+def conc2_rule(model):
+    return model.a2 <= model.b2
+model.conc2 = pe.Constraint(rule=conc2_rule)
+def conc3_rule(model):
+    return model.a3 <= model.b3
+model.conc3 = pe.Constraint(rule=conc3_rule)
+def conc4_rule(model):
+    return model.a4 <= model.b4
+model.conc4 = pe.Constraint(rule=conc4_rule)
+def conc5_rule(model):
+    return model.a5 <= model.b5
+model.conc5 = pe.Constraint(rule=conc5_rule)
+
+def conc11_rule(model):
+    return model.a11 <= model.b11
+model.conc11 = pe.Constraint(rule=conc11_rule)
+def conc21_rule(model):
+    return model.a21 <= model.b21
+model.conc21 = pe.Constraint(rule=conc21_rule)
+def conc31_rule(model):
+    return model.a31 <= model.b31
+model.conc31 = pe.Constraint(rule=conc31_rule)
+def conc41_rule(model):
+    return model.a41 <= model.b41
+model.conc41 = pe.Constraint(rule=conc41_rule)
+
+def conc12_rule(model):
+    return model.a12 <= model.b12
+model.conc12 = pe.Constraint(rule=conc12_rule)
+def conc22_rule(model):
+    return model.a22 <= model.b22
+model.conc22 = pe.Constraint(rule=conc22_rule)
+def conc32_rule(model):
+    return model.a32 <= model.b32
+model.conc32 = pe.Constraint(rule=conc32_rule)
+def conc42_rule(model):
+    return model.a42 <= model.b42
+model.conc42 = pe.Constraint(rule=conc42_rule)
+
+
+def con1_rule(model, t, sc):
+    return model.buy[t, sc] + model.NGCC[t, sc] + 0. * model.D2A[t, sc] - model.A2D[t, sc] \
+           - model.out[t, sc] - e_demand[t, sc] - ATR_eff * model.ATR[t, sc] - SMR_eff * model.SMR[t, sc] \
+           - SMRCC_eff * model.SMRCC[t, sc] == 0
+
+
+model.con1 = pe.Constraint(Ti, Sc, rule=con1_rule)
+
+
+def con1_rulea(model, t, sc):
+    return SF[t][sc] * model.XP * P_eff + model.dch[t, sc] - model.ch[t, sc] \
+           - model.p2x[t, sc] - model.p2a[t,sc] - model.D2A[t, sc] + 0. * model.A2D[t, sc] == 0
+
+
+model.con1ea = pe.Constraint(Ti, Sc, rule=con1_rulea)
+
+# End effect of battery, Hs tank, Hk tank considering lead time
+model.end_effect = pe.ConstraintList()
+for sc in Sc:
+    model.end_effect.add(
+        expr=0.999917 * model.ESS[8759, sc] + B_eff * model.ch[8759, sc] - model.dch[8759, sc] / B_eff >= model.ESS[
+            0, sc])
+    model.end_effect.add(
+        expr=0.999896 * model.YHt[8759, sc] + W_eff * model.p2x[8759, sc] + A_eff * model.p2a[8759,sc] + model.ATR[8759, sc] + model.SMR[8759,sc] + model.SMRCC[8759,sc]
+             - H_demand[8759, sc]  >= model.YHt[0, sc])
+
+
+# Component balance equation (ESS, Hs tank, Hk tank) considering lead time
+def con_rule(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return model.ESS[t + 1, sc] == 0.9999917 * model.ESS[t, sc] + B_eff * model.ch[t, sc] \
+               - model.dch[t, sc] / B_eff
+
+
+model.con3 = pe.Constraint(Ti, Sc, rule=con_rule)
+
+
+def con_rule_He(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return model.YHt[t + 1, sc] == 0.999896 * model.YHt[t, sc] + model.p2x[t, sc] * W_eff \
+               - H_demand[t, sc] + model.ATR[t, sc] + model.SMR[t,sc] + model.SMRCC[t,sc] + model.p2a[t,sc] * A_eff
+
+
+model.con_He = pe.Constraint(Ti, Sc, rule=con_rule_He)
+
+
+# operating boundary constraint
+def con7_rule(model, t, sc):
+    return model.dch[t, sc] <= 0.25 * model.XB
+
+
+model.con7 = pe.Constraint(Ti, Sc, rule=con7_rule)
+
+
+def con8_rule(model, t, sc):
+    return model.ch[t, sc] <= 0.25 * model.XB
+
+
+model.con8 = pe.Constraint(Ti, Sc, rule=con8_rule)
+
+
+def con9_rule(model, t, sc):
+    return model.p2x[t, sc] <= model.XW
+model.con9 = pe.Constraint(Ti, Sc, rule=con9_rule)
+
+def con9_rulea(model, t, sc):
+    return model.p2a[t, sc] <= model.XA
+model.con9a = pe.Constraint(Ti, Sc, rule=con9_rulea)
+
+
+def con10_rule(model, t, sc):
+    return min_W * model.XW <= model.p2x[t, sc]
+model.con10 = pe.Constraint(Ti, Sc, rule=con10_rule)
+
+def con10_rulea(model, t, sc):
+    return min_A * model.XA <= model.p2a[t, sc]
+model.con10a = pe.Constraint(Ti, Sc, rule=con10_rulea)
+
+
+def con11_rule(model, t, sc):
+    return model.ESS[t, sc] <= model.XB * 0.95
+model.con11 = pe.Constraint(Ti, Sc, rule=con11_rule)
+
+
+def con12_rule(model, t, sc):
+    return model.XB * 0.15 <= model.ESS[t, sc]
+model.con12 = pe.Constraint(Ti, Sc, rule=con12_rule)
+
+
+def con13_rule(model, t, sc):
+    return model.XNGCC * min_NGCC <= model.NGCC[t, sc]
+model.con13 = pe.Constraint(Ti, Sc, rule=con13_rule)
+
+
+def con14_rule(model, t, sc):
+    return model.NGCC[t, sc] <= model.XNGCC
+model.con14 = pe.Constraint(Ti, Sc, rule=con14_rule)
+
+
+def con15_rule(model, t, sc):
+    return model.XATR * min_ATR <= model.ATR[t, sc]
+model.con15 = pe.Constraint(Ti, Sc, rule=con15_rule)
+
+def con15_rule1(model, t, sc):
+    return model.XSMRCC * min_SMR <= model.SMRCC[t, sc]
+model.con151 = pe.Constraint(Ti, Sc, rule=con15_rule1)
+
+def con15_rule2(model, t, sc):
+    return model.XSMR * min_SMR <= model.SMR[t, sc]
+model.con152 = pe.Constraint(Ti, Sc, rule=con15_rule2)
+
+
+def con16_rule(model, t, sc):
+    return model.ATR[t, sc] <= model.XATR
+model.con16 = pe.Constraint(Ti, Sc, rule=con16_rule)
+
+def con16_rule1(model, t, sc):
+    return model.SMRCC[t, sc] <= model.XSMRCC
+model.con161 = pe.Constraint(Ti, Sc, rule=con16_rule1)
+
+def con16_rule2(model, t, sc):
+    return model.SMR[t, sc] <= model.XSMR
+model.con162 = pe.Constraint(Ti, Sc, rule=con16_rule2)
+
+
+def con17_rule(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return model.ATR[t + 1, sc] - model.ATR[t, sc] <= model.XATR * ramp_rate
+model.con17 = pe.Constraint(Ti, Sc, rule=con17_rule)
+
+def con17_rule1(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return model.SMRCC[t + 1, sc] - model.SMRCC[t, sc] <= model.XSMRCC * SMRCC_ramp_rate
+model.con171 = pe.Constraint(Ti, Sc, rule=con17_rule1)
+
+def con17_rule2(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return model.SMR[t + 1, sc] - model.SMR[t, sc] <= model.XSMR * SMR_ramp_rate
+model.con172 = pe.Constraint(Ti, Sc, rule=con17_rule2)
+
+
+def con18_rule(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return - model.XATR * ramp_rate <= model.ATR[t + 1, sc] - model.ATR[t, sc]
+model.con18 = pe.Constraint(Ti, Sc, rule=con18_rule)
+
+def con18_rule1(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return - model.XSMRCC * SMRCC_ramp_rate <= model.SMRCC[t + 1, sc] - model.SMRCC[t, sc]
+model.con181 = pe.Constraint(Ti, Sc, rule=con18_rule1)
+
+def con18_rule2(model, t, sc):
+    if t == 8759:
+        return pe.Constraint.Skip
+    else:
+        return - model.XSMR * SMR_ramp_rate <= model.SMR[t + 1, sc] - model.SMR[t, sc]
+model.con182 = pe.Constraint(Ti, Sc, rule=con18_rule2)
+
+
+def con33_rule(model, t, sc):
+    return model.YHt[t, sc] <= model.XHt
+model.con33 = pe.Constraint(Ti, Sc, rule=con33_rule)
+
+solver = pe.SolverFactory('cplex',executetable=r'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\CPLEX Optimization Studio 22.1.1\CP Optimizer Interactive.exe')
+solver.options['mipgap'] = 0.00001
+solver.options['timelimit'] = 3600 * 72
+solver.solve(model, tee=True)
+
+B_cost = 
+PEM_cost = 
+AEM_cost = 
+PV_cost = 
+H_tank_cost = 
+NGCC_cost = 
+ATR_cost =
+SMRCC_cost = 
+SMR_cost = 
+
+
+total_e_fuel = sum( ) / sc_numb / 1e6
+total_h_fuel = sum( ) / sc_numb / 1e6
+total_e_co2 = sum( ) / sc_numb / 1e6
+total_h_co2 = sum( ) / sc_numb / 1e6
+
+total_fuel_cost = ( ) * fuel_cost
+total_CO2_cost = ( ) * CO2_tax
+
+total_NGCC_variable_cost = sum( ) / sc_numb / 1e6
+total_buy_cost = sum( ) / sc_numb / 1e6
+
+total_e_cost =  
+total_e =  
+e1 = 
+e2 = 
+e3 =
+e4 = 
+
+h1 = 
+h4 = 
+h3 = 
+h2 = 
+total_h = 
+
+LCOH = model.obj()/Year_Demand*1e3
+LCOE = total_e_cost / (total_e) *1e6
+Curtail = sum(model.out[t, sc]() for t in Ti for sc in Sc)/sc_numb
+
+print('LCOH', model.obj()/Year_Demand*1e3, 'LCOE', total_e_cost / total_e *1e6)
+print('Solar', model.XP(), 'Battery', model.XB(), 'PEM', model.XW(), 'Alkaline', model.XA() ,'H tank', model.XHt() / 1000)
+print('ATR', model.XATR(),'SMR', model.XSMR(), 'SMRCC' , model.XSMRCC(), 'NGCC', model.XNGCC())
+print('Ge', e4, 'Be', e1, 'buy', e2, 'loss', e3, 'cutailment', sum(model.out[t, sc]() for t in Ti for sc in Sc))
+print('Ger', e4 / (total_e + e3), 'Ber', e1 / (total_e + e3), 'buy r', e2 / (total_e + e3), 'loss',
+      e3 // (total_e + e3))
+print('Gh', h4, 'Bh', h1, 'buy h', h2, 'loss_h', h3)
+print('Ghr', h4 / (total_h), 'Bhr', h1 / (total_h), 'buy h', h2 / (total_h), 'loss', h3 / (total_h))
+
+
+
+Period_memory = []
+Year_demand_memory = []
+Fuel_cost_memory = []
+CO2_cost_memory = []
+H_const_memory = []
+Blue_e_memory = []
+XP_memory = []
+XB_memory = []
+XW_memory = []
+XA_memory = []
+XHt_memory = []
+XNGCC_memory = []
+XATR_memory = []
+XSMRCC_memory = []
+XSMR_memory = []
+LCOH_memory = []
+LCOE_memory = []
+
+df = pd.DataFrame({
+    'PV': [model.XP()],
+    'B': [model.XB()],
+    'PEM': [model.XW()],
+    'AEM': [model.XA()],
+    'H tank': [model.XHt()],
+    'NGCC': [model.XNGCC()],
+    'ATR': [model.XATR()*24],
+    'SMRCC': [model.XSMRCC()*24],
+    'SMR': [model.XSMR()*24],
+    'LCOH': [LCOH],
+    'LCOH CO2': [total_h_co2*CO2_tax/Year_Demand*1e3],
+    'LCOH elec': [total_e_cost/Year_Demand*1e3],
+    'LCOH fuel': [total_h_fuel*fuel_cost/Year_Demand*1e3],
+    'LCOH fac': [(PEM_cost+AEM_cost+H_tank_cost+ATR_cost+SMRCC_cost+SMR_cost)/Year_Demand*1e3],
+    'LCOH test': [0],
+    'LCOE': [LCOE],
+    'LCOE wo CO2': [LCOE - total_e_co2 * CO2_tax/total_e*1e6],
+    'total e': [total_e],
+    'CO2':  [total_e_co2 +total_h_co2],
+    'NG': [total_e_fuel + total_h_fuel],
+    'XPc': [PV_cost],
+    'XBc': [B_cost],
+    'PEMc': [PEM_cost],
+    'AEMc': [AEM_cost],
+    'Htc': [H_tank_cost],
+    'NGCCc': [NGCC_cost],
+    'ATRc': [ATR_cost ],
+    'SMRCCc': [SMRCC_cost],
+    'SMRc': [SMR_cost],
+    'CO2 ec': [total_e_co2 * CO2_tax],
+    'fuel ec': [total_e_fuel * fuel_cost],
+    'NGCCvariablec': [total_NGCC_variable_cost],
+    'CO2c': [total_CO2_cost],
+    'fuelc': [total_fuel_cost],
+    'elec buy c': [total_buy_cost],
+    'Ger': [e4 / (total_e + e3)],
+    'Ber': [ e1 / (total_e + e3)],
+    'Grey r':  [e2 / (total_e + e3)],
+    'curtail r': [ Curtail / (total_e + e3) ],
+    'Ghr': [ h4 / (total_h)],
+    'Bhr':[ h1 / (total_h)],
+    'Grey hr': [h2 / (total_h)],
+    'loss': [h3 / (total_h)]
+})
+
+df.to_excel(r'path\Result.xlsx', index=False, engine='openpyxl')
